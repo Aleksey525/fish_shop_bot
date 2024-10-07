@@ -1,6 +1,6 @@
-import requests
-
 from environs import Env
+from io import BytesIO
+import requests
 import redis
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Filters, Updater, CallbackContext
@@ -17,13 +17,20 @@ def start(update, context):
 
 
 def handle_menu(update: Update, context: CallbackContext) -> str:
+    strapi_url = 'http://127.0.0.1:1337/'
     query = update.callback_query
     query.answer()
+    chat_id = update.callback_query.message.chat_id
     product_id = int(query.data)
     products = context.bot_data['products']
     selected_product = next((product for product in products if product['id'] == product_id), None)
+    image_url = selected_product['picture'][0]['formats']['medium']['url']
+    full_image_url = f'{strapi_url}{image_url}'
+    response = requests.get(full_image_url)
+    image_data = BytesIO(response.content)
+
     if selected_product:
-        query.edit_message_text(text=f"{selected_product['title']} ({selected_product['price']} руб. за кг)"
+        context.bot.send_photo(chat_id=chat_id, photo=image_data, caption=f"{selected_product['title']} ({selected_product['price']} руб. за кг)"
                                      f"\n\n{selected_product['description']}")
     return 'START'
 
@@ -48,7 +55,6 @@ def handle_users_reply(update, context):
         'HANDLE_MENU': handle_menu
     }
     state_handler = states_functions[user_state]
-    print(state_handler)
     try:
         next_state = state_handler(update, context)
         db.set(chat_id, next_state)
@@ -67,7 +73,7 @@ def main():
     strapi_token = env('STRAPI_TOKEN')
     url = 'http://127.0.0.1:1337/api/products'
     params = {
-        'fields': 'title, description, price',
+        'populate': '*',
     }
     headers = {'Authorization': f'Bearer {strapi_token}'}
     response = requests.get(url, headers=headers, params=params)
