@@ -16,6 +16,20 @@ def start(update, context):
     return 'HANDLE_MENU'
 
 
+def handle_description(update, context):
+    products = context.bot_data['products']
+    keyboard = [[InlineKeyboardButton(product['title'], callback_data=int(product['id']))] for product in products]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    chat_id = update.callback_query.message.chat_id
+    query = update.callback_query
+    query.answer()
+    if query.data == '1':
+        context.bot.delete_message(chat_id=chat_id,
+                           message_id=update.callback_query.message.message_id)
+    context.bot.send_message(chat_id=chat_id, text='МЕНЮ', reply_markup=reply_markup)
+    return 'HANDLE_MENU'
+
+
 def handle_menu(update: Update, context: CallbackContext) -> str:
     strapi_url = 'http://127.0.0.1:1337/'
     query = update.callback_query
@@ -28,11 +42,14 @@ def handle_menu(update: Update, context: CallbackContext) -> str:
     full_image_url = f'{strapi_url}{image_url}'
     response = requests.get(full_image_url)
     image_data = BytesIO(response.content)
-
+    keyboard = [[InlineKeyboardButton('Назад', callback_data='1')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.delete_message(chat_id=chat_id,
+                       message_id=update.callback_query.message.message_id)
     if selected_product:
         context.bot.send_photo(chat_id=chat_id, photo=image_data, caption=f"{selected_product['title']} ({selected_product['price']} руб. за кг)"
-                                     f"\n\n{selected_product['description']}")
-    return 'START'
+                                     f"\n\n{selected_product['description']}", reply_markup=reply_markup)
+    return 'HANDLE_DESCRIPTION'
 
 
 def handle_users_reply(update, context):
@@ -52,7 +69,8 @@ def handle_users_reply(update, context):
 
     states_functions = {
         'START': start,
-        'HANDLE_MENU': handle_menu
+        'HANDLE_MENU': handle_menu,
+        'HANDLE_DESCRIPTION': handle_description
     }
     state_handler = states_functions[user_state]
     try:
