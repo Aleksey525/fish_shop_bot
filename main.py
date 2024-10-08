@@ -23,11 +23,22 @@ def handle_description(update, context):
     chat_id = update.callback_query.message.chat_id
     query = update.callback_query
     query.answer()
-    if query.data == '1':
+    if query.data == 'back':
         context.bot.delete_message(chat_id=chat_id,
                            message_id=update.callback_query.message.message_id)
-    context.bot.send_message(chat_id=chat_id, text='МЕНЮ', reply_markup=reply_markup)
-    return 'HANDLE_MENU'
+        context.bot.send_message(chat_id=chat_id, text='МЕНЮ', reply_markup=reply_markup)
+        return 'HANDLE_MENU'
+    if query.data == 'add_to_cart':
+        strapi_token = context.bot_data['strapi_token']
+        strapi_url = 'http://127.0.0.1:1337/api/carts'
+        headers = {'Authorization': f'Bearer {strapi_token}'}
+        cart_data = {
+            'data': {
+                'tg_id': str(chat_id),
+            }
+        }
+        response = requests.post(strapi_url, headers=headers, json=cart_data)
+        return 'HANDLE_DESCRIPTION'
 
 
 def handle_menu(update: Update, context: CallbackContext) -> str:
@@ -41,8 +52,12 @@ def handle_menu(update: Update, context: CallbackContext) -> str:
     image_url = selected_product['picture'][0]['formats']['medium']['url']
     full_image_url = f'{strapi_url}{image_url}'
     response = requests.get(full_image_url)
+    response.raise_for_status()
     image_data = BytesIO(response.content)
-    keyboard = [[InlineKeyboardButton('Назад', callback_data='1')]]
+    keyboard = [
+        [InlineKeyboardButton('Назад', callback_data='back')],
+        [InlineKeyboardButton('Добавить в корзину', callback_data='add_to_cart')]
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.delete_message(chat_id=chat_id,
                        message_id=update.callback_query.message.message_id)
@@ -70,7 +85,7 @@ def handle_users_reply(update, context):
     states_functions = {
         'START': start,
         'HANDLE_MENU': handle_menu,
-        'HANDLE_DESCRIPTION': handle_description
+        'HANDLE_DESCRIPTION': handle_description,
     }
     state_handler = states_functions[user_state]
     try:
@@ -103,6 +118,7 @@ def main():
     redis_connection = redis.Redis(host=redis_host, port=redis_port,
                                    password=redis_password, db=0)
     dispatcher.bot_data['redis_connection'] = redis_connection
+    dispatcher.bot_data['strapi_token'] = strapi_token
 
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
     dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
