@@ -10,33 +10,52 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 def start(update: Update, context: CallbackContext) -> str:
     print('start')
     products = context.bot_data['products']
-    keyboard = [[InlineKeyboardButton(product['title'], callback_data=int(product['id']))] for product in products]
+    product_buttons = [[InlineKeyboardButton(product['title'], callback_data=product['id'])] for product in products]
+    cart_button = [InlineKeyboardButton('Моя корзина', callback_data='my_cart')]
+    keyboard = product_buttons + [cart_button]
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text(text='Привет!', reply_markup=reply_markup)
     return 'HANDLE_MENU'
 
 
 def handle_description(update: Update, context: CallbackContext) -> str:
-    print('handle_description')
+    strapi_token = context.bot_data['strapi_token']
+    strapi_url = 'http://127.0.0.1:1337/api/carts'
+    strapi_url_2 = 'http://127.0.0.1:1337/api/cart-products'
+    headers = {'Authorization': f'Bearer {strapi_token}'}
     products = context.bot_data['products']
-    keyboard = [[InlineKeyboardButton(product['title'], callback_data=int(product['id']))] for product in products]
+    product_buttons = [[InlineKeyboardButton(product['title'], callback_data=product['id'])] for product in products]
+    cart_button = [InlineKeyboardButton('Моя корзина', callback_data='my_cart')]
+    keyboard = product_buttons + [cart_button]
     reply_markup = InlineKeyboardMarkup(keyboard)
     chat_id = update.callback_query.message.chat_id
     query = update.callback_query
     query.answer()
+
+    if query.data == 'my_cart':
+        params = {
+            'populate[cart_products][populate]': 'products',
+        }
+        response = requests.get(strapi_url, headers=headers, params=params)
+        products = response.json()['data'][0]['cart_products']
+        product_titles = []
+        for product in products:
+            fish_title = (product['products'][0]['title'])
+            product_titles.append(fish_title)
+
+        message = "\n".join(product_titles)
+        context.bot.send_message(chat_id=chat_id, text=message)
+        return 'HANDLE_DESCRIPTION'
+
     if query.data == 'back':
         context.bot.delete_message(chat_id=chat_id,
                            message_id=update.callback_query.message.message_id)
         context.bot.send_message(chat_id=chat_id, text='МЕНЮ', reply_markup=reply_markup)
         return 'HANDLE_MENU'
+
     if query.data:
         product_id = int(update.callback_query.data)
         print(product_id)
-
-        strapi_token = context.bot_data['strapi_token']
-        strapi_url = 'http://127.0.0.1:1337/api/carts'
-        strapi_url_2 = 'http://127.0.0.1:1337/api/cart-products'
-        headers = {'Authorization': f'Bearer {strapi_token}'}
         products = context.bot_data['products']
         selected_product = next((product for product in products if product['id'] == product_id), None)
         print(selected_product)
@@ -44,6 +63,7 @@ def handle_description(update: Update, context: CallbackContext) -> str:
         cart_url = f'{strapi_url}?filters[tg_id][$eq]={chat_id}&populate=*'
         cart_response = requests.get(cart_url, headers=headers)
         cart_data = cart_response.json()['data']
+
         if cart_data:
             cart_id = cart_data[0]['id']
             print(cart_id)
@@ -65,7 +85,7 @@ def handle_description(update: Update, context: CallbackContext) -> str:
 
         create_product_response = requests.post(strapi_url_2, headers=headers, json=cart_product_data)
         create_product_response.raise_for_status()
-        product_document_id = create_product_response.json()['data']['documentId']
+        product_document_id = create_product_response.json()['data']['products'][0]['title']
 
         update_cart_data = {
             "data": {
@@ -82,13 +102,29 @@ def handle_description(update: Update, context: CallbackContext) -> str:
 
 
 def handle_menu(update: Update, context: CallbackContext) -> str:
-    print('handle_menu')
     strapi_url = 'http://127.0.0.1:1337/'
+    strapi_token = context.bot_data['strapi_token']
+    headers = {'Authorization': f'Bearer {strapi_token}'}
     query = update.callback_query
     query.answer()
     chat_id = update.callback_query.message.chat_id
+    if query.data == 'my_cart':
+        params = {
+            'populate[cart_products][populate]': 'products',
+        }
+        response = requests.get(strapi_url, headers=headers, params=params)
+        products = response.json()['data'][0]['cart_products']
+        product_titles = []
+        for product in products:
+            fish_title = (product['products'][0]['title'])
+            product_titles.append(fish_title)
+
+        message = "\n".join(product_titles)
+        context.bot.send_message(chat_id=chat_id, text=message)
+        return 'HANDLE_DESCRIPTION'
+
     product_id = int(query.data)
-    print(product_id)
+    # print(product_id)
     products = context.bot_data['products']
     selected_product = next((product for product in products if product['id'] == product_id), None)
     image_url = selected_product['picture'][0]['formats']['medium']['url']
@@ -98,7 +134,8 @@ def handle_menu(update: Update, context: CallbackContext) -> str:
     image_data = BytesIO(response.content)
     keyboard = [
         [InlineKeyboardButton('Назад', callback_data='back')],
-        [InlineKeyboardButton('Добавить в корзину', callback_data=product_id)]
+        [InlineKeyboardButton('Добавить в корзину', callback_data=product_id)],
+        [InlineKeyboardButton('Моя корзина', callback_data='my_cart')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.delete_message(chat_id=chat_id,
@@ -110,7 +147,6 @@ def handle_menu(update: Update, context: CallbackContext) -> str:
 
 
 def handle_users_reply(update: Update, context: CallbackContext) -> None:
-    print('nandle_users_reply')
     db = context.bot_data['redis_connection']
     if update.message:
         user_reply = update.message.text
@@ -137,6 +173,14 @@ def handle_users_reply(update: Update, context: CallbackContext) -> None:
         print(f"State updated to {next_state}")
     except Exception as err:
         print(err)
+
+
+# def get_cart_id(url, chat_id):
+#     cart_url = f'{url}?filters[tg_id][$eq]={chat_id}&populate=*'
+#     cart_response = requests.get(cart_url, headers=headers)
+#     cart = cart_response.json()['data']
+#
+#     pass
 
 
 def main():
