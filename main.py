@@ -44,7 +44,7 @@ def handle_description(update: Update, context: CallbackContext) -> str:
             product_titles.append(fish_title)
         keyboard = [
             [InlineKeyboardButton(f"Удалить {product['products'][0]['title']}", callback_data=product['documentId'])] for product in products]
-
+        keyboard.append([InlineKeyboardButton('Оплатить', callback_data='payment')])
         keyboard.append([InlineKeyboardButton('В меню', callback_data='in_menu')])
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -130,7 +130,7 @@ def handle_menu(update: Update, context: CallbackContext) -> str:
 
         chat_id = update.callback_query.message.chat_id
         keyboard = [
-            [InlineKeyboardButton('В меню', callback_data='in_menu')],
+            [InlineKeyboardButton('В меню', callback_data='in_menu')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -141,7 +141,6 @@ def handle_menu(update: Update, context: CallbackContext) -> str:
 
 
     product_id = int(query.data)
-    # print(product_id)
     products = context.bot_data['products']
     selected_product = next((product for product in products if product['id'] == product_id), None)
     image_url = selected_product['picture'][0]['formats']['medium']['url']
@@ -183,6 +182,7 @@ def handle_users_reply(update: Update, context: CallbackContext) -> None:
         'HANDLE_MENU': handle_menu,
         'HANDLE_DESCRIPTION': handle_description,
         'HANDLE_CART': handle_cart,
+        'WAITING_EMAIL': waiting_email,
     }
     state_handler = states_functions[user_state]
     try:
@@ -194,7 +194,6 @@ def handle_users_reply(update: Update, context: CallbackContext) -> None:
 
 
 def handle_cart(update: Update, context: CallbackContext) -> str:
-    strapi_url = 'http://127.0.0.1:1337/api/carts'
     query = update.callback_query
     query.answer()
     chat_id = update.callback_query.message.chat_id
@@ -209,6 +208,9 @@ def handle_cart(update: Update, context: CallbackContext) -> str:
         context.bot.send_message(chat_id=chat_id, text='Выберите товар:', reply_markup=reply_markup)
         return 'HANDLE_MENU'
 
+    if query.data == 'payment':
+        context.bot.send_message(chat_id=chat_id, text='Напишите ваш email:')
+        return 'WAITING_EMAIL'
 
     if query.data:
         strapi_url_2 = 'http://127.0.0.1:1337/api/cart-products'
@@ -220,6 +222,25 @@ def handle_cart(update: Update, context: CallbackContext) -> str:
         del_product_response = requests.delete(url, headers=headers)
         del_product_response.raise_for_status()
         return 'HANDLE_CART'
+
+
+def waiting_email(update: Update, context: CallbackContext) -> str:
+    strapi_clients_url = 'http://127.0.0.1:1337/api/clients'
+    strapi_token = context.bot_data['strapi_token']
+    user_email = update.message.text
+    headers = {'Authorization': f'Bearer {strapi_token}'}
+    chat_id = update.message.chat_id
+    print(user_email)
+    new_client_data = {
+        "data": {
+            "tg_id": str(chat_id),
+            'email': user_email
+        }
+    }
+    new_client_response = requests.post(strapi_clients_url, headers=headers, json=new_client_data)
+
+
+    return 'WAITING_EMAIL'
 
 
 # def get_cart_id(url, chat_id):
