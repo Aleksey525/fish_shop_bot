@@ -1,15 +1,33 @@
 import requests
 
 
-def get_products_from_cart(headers):
+def get_products_from_cart(headers, document_id):
     strapi_carts_url = 'http://127.0.0.1:1337/api/carts'
+    cart_url = f'{strapi_carts_url}/{document_id}'
     params = {
         'populate[cart_products][populate]': 'products',
     }
-    response = requests.get(strapi_carts_url, headers=headers, params=params)
-    products = response.json()['data'][0]['cart_products']
+    response = requests.get(cart_url, headers=headers, params=params)
+    products = response.json()['data']['cart_products']
     product_titles = []
     for product in products:
-        fish_title = (product['products'][0]['title'])
-        product_titles.append(fish_title)
+        fish_title = product['products']
+        for i in fish_title:
+            product_titles.append(i['title'])
     return product_titles, products
+
+
+def get_cart_id(strapi_carts_url, chat_id, headers):
+    cart_url = f'{strapi_carts_url}?filters[tg_id][$eq]={chat_id}&populate=*'
+    cart_response = requests.get(cart_url, headers=headers)
+    cart_data = cart_response.json()['data']
+    cart_id = cart_data[0]['id']
+    return cart_id
+
+
+def get_cart_document_id(strapi_carts_url, chat_id, headers):
+    cart_url = f'{strapi_carts_url}?filters[tg_id][$eq]={chat_id}&populate=*'
+    cart_response = requests.get(cart_url, headers=headers)
+    cart_data = cart_response.json()['data']
+    cart_document_id = cart_data[0]['documentId']
+    return cart_document_id

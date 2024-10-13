@@ -8,7 +8,7 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
 
 from keyboards import create_menu_keyboard, create_cart_keyboard, create_product_keyboard
-from auxiliary_functions import get_products_from_cart
+from auxiliary_functions import get_products_from_cart, get_cart_id, get_cart_document_id
 
 
 def start(update: Update, context: CallbackContext) -> str:
@@ -21,7 +21,7 @@ def start(update: Update, context: CallbackContext) -> str:
 
 def handle_description(update: Update, context: CallbackContext) -> str:
     strapi_token = context.bot_data['strapi_token']
-    strapi_url = 'http://127.0.0.1:1337/api/carts'
+    strapi_carts_url = 'http://127.0.0.1:1337/api/carts'
     strapi_cart_products_url = 'http://127.0.0.1:1337/api/cart-products'
     headers = {'Authorization': f'Bearer {strapi_token}'}
     chat_id = update.callback_query.message.chat_id
@@ -32,8 +32,10 @@ def handle_description(update: Update, context: CallbackContext) -> str:
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if query.data == 'my_cart':
-        product_titles, products = get_products_from_cart(headers)
-        chat_id = update.callback_query.message.chat_id
+        cart_document_id = get_cart_document_id(strapi_carts_url, chat_id, headers)
+        print(cart_document_id)
+        product_titles, products = get_products_from_cart(headers, cart_document_id)
+
         keyboard = create_cart_keyboard(products)
         reply_markup = InlineKeyboardMarkup(keyboard)
         message = "\n\n".join(product_titles)
@@ -51,48 +53,50 @@ def handle_description(update: Update, context: CallbackContext) -> str:
         product_id = int(update.callback_query.data)
         products = context.bot_data['products']
         selected_product = next((product for product in products if product['id'] == product_id), None)
-
-        cart_url = f'{strapi_url}?filters[tg_id][$eq]={chat_id}&populate=*'
+        cart_url = f'{strapi_carts_url}?filters[tg_id][$eq]={chat_id}&populate=*'
         cart_response = requests.get(cart_url, headers=headers)
         cart_data = cart_response.json()['data']
-
         if cart_data:
             cart_id = cart_data[0]['id']
+            cart_document_id = cart_data[0]['documentId']
         else:
             new_cart_data = {
                 "data": {
                     "tg_id": str(chat_id)
                 }
             }
-            new_cart_response = requests.post(strapi_url, headers=headers, json=new_cart_data)
-            cart_id = new_cart_response.json()['data']['documentId']
+            new_cart_response = requests.post(strapi_carts_url, headers=headers, json=new_cart_data)
+            cart_id = new_cart_response.json()['data']['id']
+            cart_document_id = new_cart_response.json()['data']['documentId']
 
         cart_product_data = {
             "data": {
                 "cart": cart_id,
-                "products": selected_product['documentId']
+                "products": selected_product['id']
             }
         }
 
         create_product_response = requests.post(strapi_cart_products_url, headers=headers, json=cart_product_data)
         create_product_response.raise_for_status()
         product_document_id = create_product_response.json()['data']['products'][0]['title']
+        print(create_product_response)
 
         update_cart_data = {
             "data": {
                 "tg_id": str(chat_id),
                 "cart_products": {
-                    "connect": [{"documentId": product_document_id}]
+                    "connect": [{"title": product_document_id}]
                 }
             }
         }
-        update_cart_response = requests.put(f'{strapi_url}/{cart_id}', headers=headers, json=update_cart_data)
+        update_cart_response = requests.put(f'{strapi_carts_url}/{cart_document_id}', headers=headers, json=update_cart_data)
         update_cart_response.raise_for_status()
         return 'HANDLE_DESCRIPTION'
 
 
 def handle_menu(update: Update, context: CallbackContext) -> str:
     strapi_url = 'http://127.0.0.1:1337/'
+    strapi_carts_url = 'http://127.0.0.1:1337/api/carts/'
     strapi_token = context.bot_data['strapi_token']
     headers = {'Authorization': f'Bearer {strapi_token}'}
     query = update.callback_query
@@ -100,8 +104,12 @@ def handle_menu(update: Update, context: CallbackContext) -> str:
     chat_id = update.callback_query.message.chat_id
 
     if query.data == 'my_cart':
-        product_titles, products = get_products_from_cart(headers)
-        chat_id = update.callback_query.message.chat_id
+        cart_document_id = get_cart_document_id(strapi_carts_url, chat_id, headers)
+        print(cart_document_id)
+        product_titles, products = get_products_from_cart(headers, cart_document_id)
+        print(product_titles)
+        print(products)
+
         keyboard = create_cart_keyboard(products)
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -201,14 +209,6 @@ def waiting_email(update: Update, context: CallbackContext) -> str:
     new_client_response.raise_for_status()
 
     return 'WAITING_EMAIL'
-
-
-# def get_cart_id(url, chat_id):
-#     cart_url = f'{url}?filters[tg_id][$eq]={chat_id}&populate=*'
-#     cart_response = requests.get(cart_url, headers=headers)
-#     cart = cart_response.json()['data']
-#
-#     pass
 
 
 def main():
