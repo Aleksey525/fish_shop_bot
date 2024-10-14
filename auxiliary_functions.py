@@ -9,11 +9,7 @@ def get_products_from_cart(headers, document_id):
     }
     response = requests.get(cart_url, headers=headers, params=params)
     products = response.json()['data']['cart_products']
-    product_titles = []
-    for product in products:
-        fish_title = product['products']
-        for i in fish_title:
-            product_titles.append(i['title'])
+    product_titles = [current_product['title'] for product in products for current_product in product['products']]
     return product_titles, products
 
 

@@ -10,8 +10,8 @@ def create_menu_keyboard(products):
 
 def create_cart_keyboard(products):
     keyboard = [
-        [InlineKeyboardButton(f"Удалить {product['products'][0]['title']}", callback_data=product['documentId'])] for
-        product in products]
+        [InlineKeyboardButton(f"Удалить {i['title']}", callback_data=i['id'])] for
+        product in products for i in product['products']]
     keyboard.append([InlineKeyboardButton('Оплатить', callback_data='payment')])
     keyboard.append([InlineKeyboardButton('В меню', callback_data='in_menu')])
     return keyboard
