@@ -29,6 +29,11 @@ npm --version
 Затем нужно создать и развернуть проект `Starapi` локально, см. 
 [документацию](https://github.com/strapi/strapi?tab=readme-ov-file#-installation)
 
+После запуска CMS создать модель товара `Product` с полями `title` - type:Text, `description` - type:Text,
+`picture` - type:Media, `price` - type:Number. После заполнить данными и поставить статус каждого продукта `Published`.
+
+
+
 ### Примеры запуска бота
 
 ```
