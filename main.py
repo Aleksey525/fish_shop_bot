@@ -1,7 +1,11 @@
+import logging
+import time
+
 from environs import Env
 from io import BytesIO
 import requests
 import redis
+import telegram
 from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import Filters, Updater, CallbackContext
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
@@ -9,6 +13,10 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
 from auxiliary_functions import get_products_from_cart, get_cart_document_id
 from keyboards import create_menu_keyboard, create_cart_keyboard, create_product_keyboard
+from logs_handler import TelegramLogsHandler, logger
+
+
+ERROR_CHECKING_DELAY = 10
 
 
 def start(update: Update, context: CallbackContext) -> str:
@@ -280,28 +288,40 @@ def main():
     redis_port = env.int('REDIS_PORT')
     redis_password = env.str('REDIS_PASSWORD')
     strapi_token = env('STRAPI_TOKEN')
+    chat_id = env.str('TG_CHAT_ID')
+    logger_bot = telegram.Bot(token=env.str('TG_LOGGER_BOT_TOKEN'))
+    logger.setLevel(logging.DEBUG)
+    telegram_handler = TelegramLogsHandler(chat_id, logger_bot)
+    telegram_handler.setLevel(logging.DEBUG)
+    logger.addHandler(telegram_handler)
+    logger.info('Телеграм-бот запущен')
     url = 'http://127.0.0.1:1337/api/products'
     params = {
         'populate': '*',
     }
     headers = {'Authorization': f'Bearer {strapi_token}'}
-    response = requests.get(url, headers=headers, params=params)
-    response.raise_for_status()
-    products = response.json()['data']
-    updater = Updater(token)
-    dispatcher = updater.dispatcher
-    dispatcher.bot_data['products'] = products
-    redis_connection = redis.Redis(host=redis_host, port=redis_port,
-                                   password=redis_password, db=0)
+    while True:
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            products = response.json()['data']
+            updater = Updater(token)
+            dispatcher = updater.dispatcher
+            dispatcher.bot_data['products'] = products
+            redis_connection = redis.Redis(host=redis_host, port=redis_port,
+                                           password=redis_password, db=0)
 
-    dispatcher.bot_data['redis_connection'] = redis_connection
-    dispatcher.bot_data['strapi_token'] = strapi_token
+            dispatcher.bot_data['redis_connection'] = redis_connection
+            dispatcher.bot_data['strapi_token'] = strapi_token
 
-    dispatcher.add_handler(CommandHandler('start', handle_users_reply))
-    dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
-    dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
-    updater.start_polling()
-    updater.idle()
+            dispatcher.add_handler(CommandHandler('start', handle_users_reply))
+            dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
+            dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
+            updater.start_polling()
+            updater.idle()
+        except Exception:
+            logger.exception('Телеграм-бот упал с ошибкой:')
+            time.sleep(ERROR_CHECKING_DELAY)
 
 
 if __name__ == '__main__':
