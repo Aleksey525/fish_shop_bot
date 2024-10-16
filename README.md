@@ -27,7 +27,9 @@ npm --version
 [ссылке](https://github.com/strapi/strapi?tab=readme-ov-file#-installation)
 
 Затем нужно создать и развернуть проект `Starapi` локально, см. 
-[документацию](https://github.com/strapi/strapi?tab=readme-ov-file#-installation)
+[документацию](https://github.com/strapi/strapi?tab=readme-ov-file#-installation).
+Локально по умолчанию [Starapi](https://github.com/strapi/strapi?tab=readme-ov-file#-installation) запускается по адресу 
+[http://localhost:1337/](http://localhost:1337/).
 
 После запуска CMS создать модель товара `Product` с полями `title` - type:Text, `description` - type:Text,
 `picture` - type:Media, `price` - type:Number. После заполнить данными и поставить статус каждого продукта `Published`.
@@ -39,8 +41,13 @@ npm --version
 Затем связать `Cart` с пользователями`(users-permissions)`, `Cart` с `CartProduct`, `CartProduct` c `Product`.
 ### Примеры запуска бота
 
+По умолчанию:
 ```
 python main.py 
+```
+С параметрами:
+```
+python main.py --host_name 'strapi host name' --port 'strapi port'
 ```
 
 ### Переменные окружения
