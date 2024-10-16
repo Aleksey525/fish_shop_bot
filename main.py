@@ -68,9 +68,13 @@ def handle_description(update: Update, context: CallbackContext) -> str:
         product_id = int(update.callback_query.data)
         products = context.bot_data['products']
         selected_product = next((product for product in products if product['id'] == product_id), None)
-        cart_url = f'{strapi_carts_url}?filters[tg_id][$eq]={chat_id}&populate=*'
-        cart_response = requests.get(cart_url, headers=headers)
+        params = {
+            'filters[tg_id][$eq]': chat_id,
+            'populate': '*'
+        }
+        cart_response = requests.get(strapi_carts_url, headers=headers, params=params)
         cart_response.raise_for_status()
+        print(cart_response.json()['data'])
         cart_data = cart_response.json()['data']
 
         if not cart_data:

@@ -15,8 +15,11 @@ def get_products_from_cart(headers, document_id):
 
 
 def get_cart_document_id(strapi_carts_url, chat_id, headers):
-    cart_url = f'{strapi_carts_url}?filters[tg_id][$eq]={chat_id}&populate=*'
-    cart_response = requests.get(cart_url, headers=headers)
+    params = {
+        'filters[tg_id][$eq]': chat_id,
+        'populate': '*'
+    }
+    cart_response = requests.get(strapi_carts_url, headers=headers, params=params)
     cart_response.raise_for_status()
     cart_data = cart_response.json()['data']
     cart_document_id = cart_data[0]['documentId']
