@@ -77,7 +77,6 @@ def handle_description(update: Update, context: CallbackContext) -> str:
         }
         cart_response = requests.get(strapi_carts_url, headers=headers, params=params)
         cart_response.raise_for_status()
-        print(cart_response.json()['data'])
         cart_data = cart_response.json()['data']
 
         if not cart_data:
@@ -219,9 +218,8 @@ def handle_users_reply(update: Update, context: CallbackContext) -> None:
     try:
         next_state = state_handler(update, context)
         db.set(chat_id, next_state)
-        print(f"State updated to {next_state}")
     except Exception as err:
-        print(err)
+        logging.error(f"An error occurred: {err}")
 
 
 def handle_cart(update: Update, context: CallbackContext) -> str:
