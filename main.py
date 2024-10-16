@@ -1,3 +1,4 @@
+import argparse
 import logging
 import time
 
@@ -29,8 +30,10 @@ def start(update: Update, context: CallbackContext) -> str:
 
 def handle_description(update: Update, context: CallbackContext) -> str:
     strapi_token = context.bot_data['strapi_token']
-    strapi_carts_url = 'http://127.0.0.1:1337/api/carts'
-    strapi_cart_products_url = 'http://127.0.0.1:1337/api/cart-products'
+    strapi_host_name = context.bot_data['strapi_host_name']
+    strapi_port = context.bot_data['strapi_port']
+    strapi_carts_url = f'http://{strapi_host_name}:{strapi_port}/api/carts/'
+    strapi_cart_products_url = f'http://{strapi_host_name}:{strapi_port}/api/cart-products/'
     headers = {'Authorization': f'Bearer {strapi_token}'}
     chat_id = update.callback_query.message.chat_id
     query = update.callback_query
@@ -41,7 +44,7 @@ def handle_description(update: Update, context: CallbackContext) -> str:
 
     if query.data == 'my_cart':
         cart_document_id = get_cart_document_id(strapi_carts_url, chat_id, headers)
-        product_titles, products = get_products_from_cart(headers, cart_document_id)
+        product_titles, products = get_products_from_cart(strapi_carts_url, headers, cart_document_id)
         current_products = products[0]['products']
 
         if not current_products:
@@ -107,7 +110,7 @@ def handle_description(update: Update, context: CallbackContext) -> str:
                     }
                 }
             }
-            update_cart_response = requests.put(f'{strapi_carts_url}/{cart_document_id}', headers=headers,
+            update_cart_response = requests.put(f'{strapi_carts_url}{cart_document_id}', headers=headers,
                                                 json=update_cart_data)
             update_cart_response.raise_for_status()
         else:
@@ -121,7 +124,7 @@ def handle_description(update: Update, context: CallbackContext) -> str:
                     }
                 }
             }
-            update_cart_product_response = requests.put(f'{strapi_cart_products_url}/{cart_product_document_id}',
+            update_cart_product_response = requests.put(f'{strapi_cart_products_url}{cart_product_document_id}',
                                                         headers=headers, json=update_cart_product_data)
             update_cart_product_response.raise_for_status()
 
@@ -133,7 +136,7 @@ def handle_description(update: Update, context: CallbackContext) -> str:
                     }
                 }
             }
-            update_cart_response = requests.put(f'{strapi_carts_url}/{cart_document_id}', headers=headers,
+            update_cart_response = requests.put(f'{strapi_carts_url}{cart_document_id}', headers=headers,
                                                 json=update_cart_data)
             update_cart_response.raise_for_status()
 
@@ -141,8 +144,10 @@ def handle_description(update: Update, context: CallbackContext) -> str:
 
 
 def handle_menu(update: Update, context: CallbackContext) -> str:
-    strapi_url = 'http://127.0.0.1:1337/'
-    strapi_carts_url = 'http://127.0.0.1:1337/api/carts/'
+    strapi_host_name = context.bot_data['strapi_host_name']
+    strapi_port = context.bot_data['strapi_port']
+    strapi_url = f'http://{strapi_host_name}:{strapi_port}/'
+    strapi_carts_url = f'http://{strapi_host_name}:{strapi_port}/api/carts/'
     strapi_token = context.bot_data['strapi_token']
     headers = {'Authorization': f'Bearer {strapi_token}'}
     query = update.callback_query
@@ -151,7 +156,7 @@ def handle_menu(update: Update, context: CallbackContext) -> str:
 
     if query.data == 'my_cart':
         cart_document_id = get_cart_document_id(strapi_carts_url, chat_id, headers)
-        product_titles, products = get_products_from_cart(headers, cart_document_id)
+        product_titles, products = get_products_from_cart(strapi_carts_url, headers, cart_document_id)
         current_products = products[0]['products']
 
         if not current_products:
@@ -239,17 +244,19 @@ def handle_cart(update: Update, context: CallbackContext) -> str:
         product_id = query.data
         strapi_token = context.bot_data['strapi_token']
         headers = {'Authorization': f'Bearer {strapi_token}'}
-        strapi_carts_url = 'http://127.0.0.1:1337/api/carts'
-        strapi_cart_product_url = 'http://127.0.0.1:1337/api/cart-products'
+        strapi_host_name = context.bot_data['strapi_host_name']
+        strapi_port = context.bot_data['strapi_port']
+        strapi_carts_url = f'http://{strapi_host_name}:{strapi_port}/api/carts/'
+        strapi_cart_product_url = f'http://{strapi_host_name}:{strapi_port}/api/cart-products/'
         cart_document_id = get_cart_document_id(strapi_carts_url, chat_id, headers)
-        cart_url = f'{strapi_carts_url}/{cart_document_id}'
+        cart_url = f'{strapi_carts_url}{cart_document_id}'
         params = {
             'populate': '*',
         }
         response = requests.get(cart_url, headers=headers, params=params)
         response.raise_for_status()
         cart_product_document_id = response.json()['data']['cart_products'][0]['documentId']
-        cart_product_url = f"{strapi_cart_product_url}/{cart_product_document_id}"
+        cart_product_url = f"{strapi_cart_product_url}{cart_product_document_id}"
 
         updated_data = {
             'data': {
@@ -267,7 +274,9 @@ def handle_cart(update: Update, context: CallbackContext) -> str:
 
 
 def waiting_email(update: Update, context: CallbackContext) -> str:
-    strapi_clients_url = 'http://127.0.0.1:1337/api/clients'
+    strapi_host_name = context.bot_data['strapi_host_name']
+    strapi_port = context.bot_data['strapi_port']
+    strapi_clients_url = f'http://{strapi_host_name}:{strapi_port}/api/clients'
     strapi_token = context.bot_data['strapi_token']
     user_email = update.message.text
     headers = {'Authorization': f'Bearer {strapi_token}'}
@@ -286,6 +295,14 @@ def waiting_email(update: Update, context: CallbackContext) -> str:
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description='Бот для продажи рыбы через телеграмм'
+    )
+    parser.add_argument('--host_name', default='127.0.0.1', type=str, help='strapi_host_name')
+    parser.add_argument('--port', default='1337', type=str, help='strapi_port')
+    args = parser.parse_args()
+    strapi_host_name = args.host_name
+    strapi_port = args.port
     env = Env()
     env.read_env()
     token = env.str('TG_BOT_TOKEN')
@@ -300,7 +317,7 @@ def main():
     telegram_handler.setLevel(logging.DEBUG)
     logger.addHandler(telegram_handler)
     logger.info('Телеграм-бот запущен')
-    url = 'http://127.0.0.1:1337/api/products'
+    url = f'http://{strapi_host_name}:{strapi_port}/api/products'
     params = {
         'populate': '*',
     }
@@ -312,6 +329,8 @@ def main():
             products = response.json()['data']
             updater = Updater(token)
             dispatcher = updater.dispatcher
+            dispatcher.bot_data['strapi_host_name'] = strapi_host_name
+            dispatcher.bot_data['strapi_port'] = strapi_port
             dispatcher.bot_data['products'] = products
             redis_connection = redis.Redis(host=redis_host, port=redis_port,
                                            password=redis_password, db=0)

@@ -1,9 +1,8 @@
 import requests
 
 
-def get_products_from_cart(headers, document_id):
-    strapi_carts_url = 'http://127.0.0.1:1337/api/carts'
-    cart_url = f'{strapi_carts_url}/{document_id}'
+def get_products_from_cart(strapi_carts_url, headers, document_id):
+    cart_url = f'{strapi_carts_url}{document_id}'
     params = {
         'populate[cart_products][populate]': 'products',
     }
