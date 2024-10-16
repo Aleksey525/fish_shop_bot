@@ -85,8 +85,9 @@ def handle_description(update: Update, context: CallbackContext) -> str:
             }
             new_cart_response = requests.post(strapi_carts_url, headers=headers, json=new_cart_data)
             new_cart_response.raise_for_status()
-            cart_id = new_cart_response.json()['data']['id']
-            cart_document_id = new_cart_response.json()['data']['documentId']
+            new_cart_data = new_cart_response.json()['data']
+            cart_id = new_cart_data['id']
+            cart_document_id = new_cart_data['documentId']
             cart_product_data = {
                 "data": {
                     "cart": cart_id,
